@@ -1,4 +1,6 @@
 const {app, BrowserWindow} = require('electron')
+const { ipcMain } = require('electron')
+const { MAIN_REQUEST, RENDERER_TO_MAIN_CHANNEL, MAIN_TO_RENDERER_CHANNEL } = require('./constants');
   
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -45,5 +47,12 @@ app.on('activate', () => {
   }
 })
 
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.
+// Communicate with renderer process
+ipcMain.on(RENDERER_TO_MAIN_CHANNEL, (event, message) => {
+  console.log("Message from renderer:", message);
+  if (message == MAIN_REQUEST) {
+    event.sender.send(MAIN_TO_RENDERER_CHANNEL, 'Chicken Soup');
+  } else {
+    event.sender.send(MAIN_TO_RENDERER_CHANNEL, 'Not sure how to respond');
+  }
+})
