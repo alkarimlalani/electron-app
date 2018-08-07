@@ -2,6 +2,8 @@ const {app, BrowserWindow} = require('electron')
 const { ipcMain } = require('electron')
 const { MAIN_REQUEST, GET_USERS, RENDERER_TO_MAIN_CHANNEL, MAIN_TO_RENDERER_CHANNEL } = require('./constants');
 const fetch = require('node-fetch');
+const express = require('express')
+const bodyParser = require('body-parser');
 
 const sampleUserApi = 'https://reqres.in/api/users'
   
@@ -52,7 +54,7 @@ app.on('activate', () => {
 
 // Communicate with renderer process
 ipcMain.on(RENDERER_TO_MAIN_CHANNEL, (event, message) => {
-  console.log("Message from renderer:", message);
+  console.log("Message from renderer to main:", message);
   if (message === MAIN_REQUEST) {
     event.sender.send(MAIN_TO_RENDERER_CHANNEL, 'Chicken Soup');
   } else if (message === GET_USERS) {
@@ -66,6 +68,26 @@ ipcMain.on(RENDERER_TO_MAIN_CHANNEL, (event, message) => {
 
 
 function makeRequest() {
-  return fetch(sampleUserApi)
-    .then(res => res.json())
+  const body = {
+    url: sampleUserApi
+  }
+  return fetch(`http://localhost:${port}`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+    headers: { 'Content-Type': 'application/json' }
+  }).then(res => res.json())
 }
+
+// Create a proxy server for all HTTP requests
+const server = express()
+server.use(bodyParser.json());
+const port = 3000
+
+server.post('/', async function(req, res){
+  url = req.body.url;
+  const proxiedResponse = await fetch(url);
+  const jsonResponse = await proxiedResponse.json();
+  return res.json(jsonResponse);
+});
+
+server.listen(port);

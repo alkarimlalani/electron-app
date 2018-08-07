@@ -4,7 +4,7 @@ const { MAIN_REQUEST, GET_USERS } = require('./constants');
 
 // Log messages from the parent process
 process.on('message', message => {
-  console.log('message from renderer:', message);
+  console.log('Message from renderer from child:', message);
 });
 
 // Send messages to the parent process
