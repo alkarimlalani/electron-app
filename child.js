@@ -1,6 +1,6 @@
 console.log("hello from your child");
 
-const { MAIN_REQUEST } = require('./constants');
+const { MAIN_REQUEST, GET_USERS } = require('./constants');
 
 // Log messages from the parent process
 process.on('message', message => {
@@ -10,4 +10,5 @@ process.on('message', message => {
 // Send messages to the parent process
 if (process.send) {
   process.send(MAIN_REQUEST);
+  process.send(GET_USERS);
 }

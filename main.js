@@ -1,6 +1,9 @@
 const {app, BrowserWindow} = require('electron')
 const { ipcMain } = require('electron')
-const { MAIN_REQUEST, RENDERER_TO_MAIN_CHANNEL, MAIN_TO_RENDERER_CHANNEL } = require('./constants');
+const { MAIN_REQUEST, GET_USERS, RENDERER_TO_MAIN_CHANNEL, MAIN_TO_RENDERER_CHANNEL } = require('./constants');
+const fetch = require('node-fetch');
+
+const sampleUserApi = 'https://reqres.in/api/users'
   
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -50,9 +53,19 @@ app.on('activate', () => {
 // Communicate with renderer process
 ipcMain.on(RENDERER_TO_MAIN_CHANNEL, (event, message) => {
   console.log("Message from renderer:", message);
-  if (message == MAIN_REQUEST) {
+  if (message === MAIN_REQUEST) {
     event.sender.send(MAIN_TO_RENDERER_CHANNEL, 'Chicken Soup');
+  } else if (message === GET_USERS) {
+    makeRequest().then( (resp) => {
+      event.sender.send(MAIN_TO_RENDERER_CHANNEL, resp);
+    })
   } else {
     event.sender.send(MAIN_TO_RENDERER_CHANNEL, 'Not sure how to respond');
   }
 })
+
+
+function makeRequest() {
+  return fetch(sampleUserApi)
+    .then(res => res.json())
+}
