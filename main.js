@@ -1,12 +1,11 @@
 const {app, BrowserWindow} = require('electron')
 const { ipcMain } = require('electron')
-const { MAIN_REQUEST, GET_USERS, RENDERER_TO_MAIN_CHANNEL, MAIN_TO_RENDERER_CHANNEL } = require('./constants');
+const { MAIN_REQUEST, RENDERER_TO_MAIN_CHANNEL, MAIN_TO_RENDERER_CHANNEL } = require('./constants');
 const fetch = require('node-fetch');
 const express = require('express')
 const bodyParser = require('body-parser');
+const net = require('net');
 
-const sampleUserApi = 'https://reqres.in/api/users'
-  
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
 let win
@@ -57,37 +56,44 @@ ipcMain.on(RENDERER_TO_MAIN_CHANNEL, (event, message) => {
   console.log("Message from renderer to main:", message);
   if (message === MAIN_REQUEST) {
     event.sender.send(MAIN_TO_RENDERER_CHANNEL, 'Chicken Soup');
-  } else if (message === GET_USERS) {
-    makeRequest().then( (resp) => {
-      event.sender.send(MAIN_TO_RENDERER_CHANNEL, resp);
-    })
   } else {
     event.sender.send(MAIN_TO_RENDERER_CHANNEL, 'Not sure how to respond');
   }
 })
 
-
-function makeRequest() {
-  const body = {
-    url: sampleUserApi
-  }
-  return fetch(`http://localhost:${port}`, {
-    method: 'POST',
-    body: JSON.stringify(body),
-    headers: { 'Content-Type': 'application/json' }
-  }).then(res => res.json())
-}
-
-// Create a proxy server for all HTTP requests
-const server = express()
-server.use(bodyParser.json());
+// Create a http proxy server for all HTTP requests
+const httpServer = express()
+httpServer.use(bodyParser.json());
 const port = 3000
 
-server.post('/', async function(req, res){
-  url = req.body.url;
+httpServer.post('/', async function(req, res){
+  const url = req.body.url;
   const proxiedResponse = await fetch(url);
   const jsonResponse = await proxiedResponse.json();
   return res.json(jsonResponse);
 });
 
-server.listen(port);
+httpServer.listen(port);
+
+// Create a net socket server to proxy HTTP requests
+const socketServer = net.createServer((c) => {
+  // 'connection' listener
+  console.log('client connected');
+  
+  c.on('end', () => {
+    console.log('client disconnected');
+  });
+
+  c.on('data', async function (data) {
+    const url = data.toString();
+    const proxiedResponse = await fetch(url);
+    const jsonResponse = await proxiedResponse.json();
+    c.write(`${JSON.stringify(jsonResponse)}\r`);
+  });
+});
+socketServer.on('error', (err) => {
+  throw err;
+});
+socketServer.listen(8124, () => {
+  console.log('server bound');
+});
