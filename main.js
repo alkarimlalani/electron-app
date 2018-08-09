@@ -2,9 +2,7 @@ const {app, BrowserWindow} = require('electron')
 const { ipcMain } = require('electron')
 const { MAIN_REQUEST, RENDERER_TO_MAIN_CHANNEL, MAIN_TO_RENDERER_CHANNEL } = require('./constants');
 const fetch = require('node-fetch');
-const express = require('express')
-const bodyParser = require('body-parser');
-const net = require('net');
+const http = require('http');
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -62,38 +60,40 @@ ipcMain.on(RENDERER_TO_MAIN_CHANNEL, (event, message) => {
 })
 
 // Create a http proxy server for all HTTP requests
-const httpServer = express()
-httpServer.use(bodyParser.json());
 const port = 3000
 
-httpServer.post('/', async function(req, res){
-  const url = req.body.url;
-  const proxiedResponse = await fetch(url);
-  const jsonResponse = await proxiedResponse.json();
-  return res.json(jsonResponse);
-});
+http.createServer((request, response) => {
+  // Only accept POST requests
+  // POST requests includes the URL and options for the request
+  if(request.method == 'POST') {
+    let queryData = '';
+    request.on('data', (data) => {
+      queryData += data;
+    });
 
-httpServer.listen(port);
+    request.on('end', () => {
+      const data = JSON.parse(queryData);
+      console.log("Data", data);
+      fetch(data.url, data.options)
+      .then(res => {
+        return new Promise((resolve, reject) => {
+          const headers = res.headers.raw();
+          delete headers['content-encoding'];
+          response.writeHead(res.status, headers);
+          res.body.on('data', (chunk) => {
+            // console.log('writing chunk');
+            response.write(chunk);
+          });
 
-// Create a net socket server to proxy HTTP requests
-const socketServer = net.createServer((c) => {
-  // 'connection' listener
-  console.log('client connected');
-  
-  c.on('end', () => {
-    console.log('client disconnected');
-  });
+          res.body.on('end', () => {
+            response.end();
+            resolve();
+          })
+        });
+      });
+    })
+  } else {
+    Error('Incorrect request method')
+  }
+}).listen(port);
 
-  c.on('data', async function (data) {
-    const url = data.toString();
-    const proxiedResponse = await fetch(url);
-    const jsonResponse = await proxiedResponse.json();
-    c.write(`${JSON.stringify(jsonResponse)}\r`);
-  });
-});
-socketServer.on('error', (err) => {
-  throw err;
-});
-socketServer.listen(8124, () => {
-  console.log('server bound');
-});

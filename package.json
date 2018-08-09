@@ -10,9 +10,7 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "body-parser": "^1.18.3",
     "electron": "^2.0.6",
-    "express": "^4.16.3",
     "node-fetch": "^2.2.0"
   }
 }

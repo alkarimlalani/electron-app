@@ -1,48 +1,77 @@
-const { MAIN_REQUEST } = require('./constants');
 const fetch = require('node-fetch');
-const net = require('net');
+const fs = require('fs');
 
 console.log("hello from your child");
 
-// Log messages from the parent process
-process.on('message', message => {
-  console.log('Message from renderer from child:', message);
-});
+// Make requests to local-host
 
-// Send messages to the parent process
-if (process.send) {
-  process.send(MAIN_REQUEST);
-}
-
-
-// Make request to local-host
-const sampleUserApi = 'https://reqres.in/api/users'
-
-function makeRequest() {
+// Fetch a simple JSON object
+const sampleUserApi = 'https://reqres.in/api/users';
+function fetchJson() {
   const body = {
-    url: sampleUserApi
+    url: sampleUserApi,
+    options: {},
   }
+  request(body).then(printJson)
+}
+fetchJson();
+
+// Download an image
+const imageUrl = 'https://assets-cdn.github.com/images/modules/logos_page/Octocat.png';
+function downloadImage() {
+  const body = {
+    url: imageUrl,
+    options: {},
+  }
+  request(body).then(saveFile('./octocat.png'));
+}
+downloadImage();
+
+// Download a 100MB file
+const bigFileUrl = 'https://speed.hetzner.de/100MB.bin'
+function downloadBigFile() {
+  const body = {
+    url: bigFileUrl,
+    options: {}
+  }
+  request(body).then(saveFile('./bigFile.bin'));
+}
+downloadBigFile();
+
+//
+// Utility methods to make and handle requests
+//
+function request(body) {
   return fetch(`http://localhost:3000`, {
     method: 'POST',
     body: JSON.stringify(body),
     headers: { 'Content-Type': 'application/json' }
-  }).then(res => res.json())
+  })
 }
 
-makeRequest().then((response) => {
-  console.log("HTTP Request was returned with the following response", response)
-})
+function printJson(res) {
+  res.json().then((json) => {
+    console.log(json);
+  })
+}
 
-const client = net.createConnection({ port: 8124 }, () => {
-  // 'connect' listener
-  console.log('connected to server!');
-  client.write(`${sampleUserApi}\r`);
-});
-client.on('data', (data) => {
-  const str = data.toString();
-  const json = JSON.parse(str);
-  console.log("Main sent us this data via socket:", json);
-});
-client.on('end', () => {
-  console.log('disconnected from server');
-});
+function saveFile(fileName) {
+  return function(res) {
+    return new Promise((resolve, reject) => {
+      const dest = fs.createWriteStream(fileName);
+      res.body.pipe(dest);
+      res.body.on('error', err => {
+        console.log(`Error saving ${fileName}`);
+        reject(err);
+      });
+      dest.on('finish', () => {
+        console.log(`Finished saving ${fileName}`);
+        resolve();
+      });
+      dest.on('error', err => {
+        console.log(`Error saving ${fileName}`);
+        reject(err);
+      });
+    });
+  };
+}
